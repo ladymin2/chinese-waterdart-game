@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>중국어 단어 물풍선 사격 게임</title>
+<!-- 해서체(KaiTi) 및 깔끔한 한글 폰트 로드 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Sans+KR:wght@500;700;900&family=Noto+Serif+SC:wght@600;700&display=swap" rel="stylesheet">
+<!-- 꽃가루(Confetti) 라이브러리 -->
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+<style>
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+  }
+
+  body {
+    background: linear-gradient(180deg, #bbf2f6 0%, #86e3ce 100%);
+    font-family: 'Noto Sans KR', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  #game-wrapper {
+    position: relative;
+    width: 850px;
+    height: 720px;
+    background: #ffffff;
+    border-radius: 24px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    border: 4px solid #48bb78;
+  }
+
+  /* 상단 상태창 */
+  #header-bar {
+    height: 50px;
+    background: #2f855a;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  /* 풍선이 떨어지는 영역 */
+  #play-area {
+    position: relative;
+    flex: 1;
+    background: radial-gradient(circle at 50% 30%, #e6fffa 0%, #ebf8ff 100%);
+    overflow: hidden;
+    cursor: crosshair;
+  }
+
+  /* 물풍선 스타일 */
+  .balloon {
+    position: absolute;
+    width: 105px;
+    height: 130px;
+    border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: inset -8px -8px 15px rgba(0,0,0,0.18), inset 8px 8px 15px rgba(255,255,255,0.6), 0 8px 12px rgba(0,0,0,0.15);
+    cursor: pointer;
+    transition: transform 0.05s linear;
+    z-index: 10;
+  }
+
+  /* 물풍선 묶음 꼭지 */
+  .balloon::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    width: 0;
+    height: 0;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-bottom: 9px solid inherit;
+  }
+
+  /* 해서체 중국어 간화자 */
+  .hanzi {
+    font-family: 'Ma Shan Zheng', 'Noto Serif SC', 'KaiTi', 'STKaiti', serif;
+    font-size: 32px;
+    font-weight: bold;
+    color: #1a202c;
+    line-height: 1.1;
+    text-shadow: 1px 1px 2px rgba(255,255,255,0.7);
+  }
+
+  /* 한어병음 */
+  .pinyin {
+    font-size: 13px;
+    font-weight: 700;
+    color: #2d3748;
+    margin-top: 3px;
+    background: rgba(255,255,255,0.6);
+    padding: 1px 6px;
+    border-radius: 10px;
+  }
+
+  /* 풍선 터지는 효과 애니메이션 */
+  .pop-effect {
+    position: absolute;
+    width: 130px;
+    height: 130px;
+    pointer-events: none;
+    border-radius: 50%;
+    animation: popAnim 0.35s ease-out forwards;
+    z-index: 15;
+  }
+  @keyframes popAnim {
+    0% { transform: scale(0.6); opacity: 1; filter: drop-shadow(0 0 15px #ffd700); }
+    100% { transform: scale(1.6); opacity: 0; }
+  }
+
+  /* 다트 애니메이션 */
+  .dart {
+    position: absolute;
+    width: 44px;
+    height: 44px;
+    pointer-events: none;
+    z-index: 50;
+    transform: translate(-50%, -50%);
+    transition: all 0.16s cubic-bezier(0.2, 0.8, 0.4, 1.2);
+  }
+
+  /* 하단 컨트롤 및 단어 제시 영역 */
+  #bottom-panel {
+    height: 110px;
+    background: #edf2f7;
+    border-top: 3px solid #cbd5e0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    gap: 16px;
+  }
+
+  /* 한국어 뜻 제시 상자 */
+  #target-box {
+    flex: 1;
+    background: #ffffff;
+    border: 3px solid #319795;
+    border-radius: 16px;
+    height: 74px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 20px;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+  }
+
+  #target-label {
+    font-size: 16px;
+    color: #4a5568;
+    margin-right: 12px;
+    font-weight: 700;
+  }
+
+  #target-meaning {
+    font-size: 26px;
+    font-weight: 900;
+    color: #e53e3e;
+    letter-spacing: -0.5px;
+  }
+
+  /* 버튼 영역 */
+  .btn-group {
+    display: flex;
+    gap: 10px;
+  }
+
+  .btn {
+    height: 64px;
+    padding: 0 22px;
+    font-size: 18px;
+    font-weight: 800;
+    border-radius: 14px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  }
+  .btn:active {
+    transform: translateY(2px);
+    box-shadow: none;
+  }
+
+  #btn-start {
+    background: #38a169;
+    color: #fff;
+  }
+  #btn-start:hover { background: #2f855a; }
+
+  #btn-end {
+    background: #e53e3e;
+    color: #fff;
+  }
+  #btn-end:hover { background: #c53030; }
+
+  /* 성공 축하 팝업 모달 */
+  #celebration-modal {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; } to { opacity: 1; }
+  }
+
+  .modal-card {
+    background: #fff;
+    padding: 30px 45px;
+    border-radius: 28px;
+    text-align: center;
+    box-shadow: 0 20px 45px rgba(0,0,0,0.3);
+    max-width: 440px;
+    width: 90%;
+    animation: bounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  @keyframes bounceIn {
+    0% { transform: scale(0.4); } 100% { transform: scale(1); }
+  }
+
+  .modal-title {
+    font-size: 34px;
+    font-weight: 900;
+    color: #dd6b20;
+    margin-bottom: 12px;
+    font-family: 'Ma Shan Zheng', 'Noto Sans KR', sans-serif;
+  }
+
+  .modal-desc {
+    font-size: 16px;
+    color: #4a5568;
+    margin-bottom: 15px;
+    font-weight: 700;
+  }
+
+  /* 판다 + 폭죽 일러스트 */
+  .panda-container {
+    width: 170px;
+    height: 170px;
+    margin: 0 auto 18px;
+  }
+
+  #btn-restart {
+    background: #3182ce;
+    color: #fff;
+    font-size: 18px;
+    font-weight: 800;
+    padding: 12px 30px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(49, 130, 206, 0.3);
+    transition: 0.15s;
+  }
+  #btn-restart:hover {
+    background: #2b6cb0;
+  }
+</style>
+</head>
+<body>
+
+<div id="game-wrapper">
+  <!-- 상단 상태바 -->
+  <div id="header-bar">
+    <div>🎈 중국어 단어 물풍선 사격</div>
+    <div>남은 단어: <span id="remain-count" style="color:#ffd700;">13</span> / 13</div>
+  </div>
+
+  <!-- 물풍선 영역 -->
+  <div id="play-area"></div>
+
+  <!-- 하단 문제 제시 및 버튼 바 -->
+  <div id="bottom-panel">
+    <div id="target-box">
+      <span id="target-label">맞출 한국어 뜻 :</span>
+      <span id="target-meaning">게임을 시작해주세요!</span>
+    </div>
+    <div class="btn-group">
+      <button id="btn-start" class="btn">게임 시작</button>
+      <button id="btn-end" class="btn">게임 종료</button>
+    </div>
+  </div>
+
+  <!-- 게임 완료 축하 모달 -->
+  <div id="celebration-modal">
+    <div class="modal-card">
+      <div class="modal-title">你真厉害~!!!</div>
+      <div class="modal-desc">모든 단어를 멋지게 명중시켰어요! 🎉</div>
+      
+      <div class="panda-container">
+        <svg viewBox="0 0 200 200" width="100%" height="100%">
+          <g stroke="#f6ad55" stroke-width="3" stroke-linecap="round">
+            <line x1="165" y1="45" x2="185" y2="25" />
+            <line x1="165" y1="65" x2="190" y2="70" />
+            <line x1="145" y1="35" x2="140" y2="15" />
+            <line x1="150" y1="50" x2="175" y2="50" stroke="#fc8181" stroke-width="4"/>
+          </g>
+          <polygon points="135,75 160,50 170,60 145,85" fill="#e53e3e" />
+          <polygon points="142,68 155,55 160,60 147,73" fill="#f6e05e" />
+
+          <ellipse cx="100" cy="140" rx="55" ry="45" fill="#f7fafc" stroke="#2d3748" stroke-width="4" />
+          <ellipse cx="100" cy="145" rx="36" ry="28" fill="#edf2f7" />
+          
+          <circle cx="65" cy="65" r="18" fill="#2d3748" />
+          <circle cx="135" cy="65" r="18" fill="#2d3748" />
+
+          <circle cx="100" cy="95" r="46" fill="#ffffff" stroke="#2d3748" stroke-width="4" />
+          
+          <ellipse cx="82" cy="92" rx="12" ry="15" fill="#2d3748" transform="rotate(-15 82 92)" />
+          <ellipse cx="118" cy="92" rx="12" ry="15" fill="#2d3748" transform="rotate(15 118 92)" />
+          <circle cx="85" cy="90" r="4" fill="#ffffff" />
+          <circle cx="115" cy="90" r="4" fill="#ffffff" />
+
+          <ellipse cx="100" cy="103" rx="7" ry="5" fill="#2d3748" />
+          <path d="M 94 108 Q 100 115 106 108" stroke="#2d3748" stroke-width="3" fill="none" stroke-linecap="round" />
+          <circle cx="70" cy="105" r="7" fill="#feb2b2" opacity="0.6" />
+          <circle cx="130" cy="105" r="7" fill="#feb2b2" opacity="0.6" />
+
+          <circle cx="58" cy="122" r="15" fill="#2d3748" />
+          <circle cx="140" cy="85" r="15" fill="#2d3748" />
+          <ellipse cx="75" cy="175" rx="16" ry="12" fill="#2d3748" />
+          <ellipse cx="125" cy="175" rx="16" ry="12" fill="#2d3748" />
+        </svg>
+      </div>
+
+      <button id="btn-restart">게임 다시 시작</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // 단어 데이터 (13개)
+  const wordDatabase = [
+    { hanzi: "需要", pinyin: "xūyào", meaning: "필요하다" },
+    { hanzi: "塑料袋", pinyin: "sùliàodài", meaning: "비닐봉지" },
+    { hanzi: "带", pinyin: "dài", meaning: "지니다, 챙기다" },
+    { hanzi: "了", pinyin: "le", meaning: "동작의 완료/변화 (~했다)" },
+    { hanzi: "环保袋", pinyin: "huánbǎodài", meaning: "장바구니(친환경 가방)" },
+    { hanzi: "一共", pinyin: "yígòng", meaning: "모두, 다 합해서" },
+    { hanzi: "付", pinyin: "fù", meaning: "지불하다, 내다" },
+    { hanzi: "一下", pinyin: "yíxià", meaning: "좀 해보다, 한번" },
+    { hanzi: "二维码", pinyin: "èrwéimǎ", meaning: "QR코드" },
+    { hanzi: "多少", pinyin: "duōshao", meaning: "얼마, 몇" },
+    { hanzi: "钱", pinyin: "qián", meaning: "돈" },
+    { hanzi: "用", pinyin: "yòng", meaning: "사용하다, 쓰다" },
+    { hanzi: "扫", pinyin: "sǎo", meaning: "스캔하다, 쓸다" }
+  ];
+
+  const balloonColors = [
+    { bg: "#ff7675", text: "#741616" },
+    { bg: "#74b9ff", text: "#0c3b6d" },
+    { bg: "#55efc4", text: "#0d5341" },
+    { bg: "#ffeaa7", text: "#634a00" },
+    { bg: "#a29bfe", text: "#2e2175" },
+    { bg: "#fd79a8", text: "#5c132d" },
+    { bg: "#fab1a0", text: "#632719" }
+  ];
+
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  let audioCtx = null;
+
+  function initAudio() {
+    if (!audioCtx) audioCtx = new AudioContext();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  }
+
+  // 성공음 (탁!)
+  function playHitSound() {
+    initAudio();
+    const now = audioCtx.currentTime;
+    
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(650, now);
+    osc.frequency.exponentialRampToValueAtTime(140, now + 0.12);
+
+    gain.gain.setValueAtTime(0.7, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(now);
+    osc.stop(now + 0.12);
+
+    const osc2 = audioCtx.createOscillator();
+    const gain2 = audioCtx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(1200, now);
+    osc2.frequency.exponentialRampToValueAtTime(400, now + 0.08);
+
+    gain2.gain.setValueAtTime(0.6, now);
+    gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+
+    osc2.connect(gain2);
+    gain2.connect(audioCtx.destination);
+    osc2.start(now);
+    osc2.stop(now + 0.08);
+  }
+
+  // 실패음 (띠옹~)
+  function playWrongSound() {
+    initAudio();
+    const now = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(320, now);
+    osc.frequency.linearRampToValueAtTime(180, now + 0.15);
+    osc.frequency.linearRampToValueAtTime(260, now + 0.28);
+    osc.frequency.exponentialRampToValueAtTime(100, now + 0.55);
+
+    gain.gain.setValueAtTime(0.35, now);
+    gain.gain.linearRampToValueAtTime(0.3, now + 0.3);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(now);
+    osc.stop(now + 0.55);
+  }
+
+  // 폭죽음
+  function playFireworkSound() {
+    initAudio();
+    for(let i = 0; i < 3; i++) {
+      setTimeout(() => {
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(400 + Math.random() * 200, now);
+        osc.frequency.exponentialRampToValueAtTime(60, now + 0.4);
+
+        gain.gain.setValueAtTime(0.5, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.4);
+      }, i * 260);
+    }
+  }
+
+  let remainingList = [];
+  let currentTarget = null;
+  let activeBalloons = [];
+  let isGameRunning = false;
+  let spawnTimer = null;
+  let animFrameId = null;
+
+  const playArea = document.getElementById('play-area');
+  const targetMeaningEl = document.getElementById('target-meaning');
+  const remainCountEl = document.getElementById('remain-count');
+  const btnStart = document.getElementById('btn-start');
+  const btnEnd = document.getElementById('btn-end');
+  const celebrationModal = document.getElementById('celebration-modal');
+  const btnRestart = document.getElementById('btn-restart');
+
+  function shootDart(targetX, targetY, callback) {
+    const dart = document.createElement('div');
+    dart.className = 'dart';
+    dart.innerHTML = `
+      <svg viewBox="0 0 60 60" width="100%" height="100%">
+        <polygon points="30,4 37,28 30,23 23,28" fill="#e53e3e" />
+        <polygon points="30,23 35,46 25,46" fill="#dd6b20" />
+        <polygon points="30,46 38,58 30,52 22,58" fill="#3182ce" />
+        <line x1="30" y1="0" x2="30" y2="10" stroke="#718096" stroke-width="2.5" stroke-linecap="round" />
+      </svg>
+    `;
+
+    const startX = playArea.clientWidth / 2;
+    const startY = playArea.clientHeight;
+
+    dart.style.left = `${startX}px`;
+    dart.style.top = `${startY}px`;
+    dart.style.transform = `translate(-50%, -50%) scale(0.6) rotate(${Math.atan2(targetX - startX, -(targetY - startY)) * (180 / Math.PI)}deg)`;
+    playArea.appendChild(dart);
+
+    requestAnimationFrame(() => {
+      dart.style.left = `${targetX}px`;
+      dart.style.top = `${targetY}px`;
+      dart.style.transform = `translate(-50%, -50%) scale(1.1) rotate(${Math.atan2(targetX - startX, -(targetY - startY)) * (180 / Math.PI)}deg)`;
+    });
+
+    setTimeout(() => {
+      dart.remove();
+      if (callback) callback();
+    }, 160);
+  }
+
+  function spawnBalloon() {
+    if (!isGameRunning) return;
+
+    let wordData;
+    const isTargetOnScreen = activeBalloons.some(b => b.word.hanzi === currentTarget.hanzi);
+
+    if (!isTargetOnScreen && Math.random() < 0.65) {
+      wordData = currentTarget;
+    } else {
+      wordData = wordDatabase[Math.floor(Math.random() * wordDatabase.length)];
+    }
+
+    const color = balloonColors[Math.floor(Math.random() * balloonColors.length)];
+    const el = document.createElement('div');
+    el.className = 'balloon';
+    el.style.backgroundColor = color.bg;
+
+    el.innerHTML = `
+      <div class="hanzi">${wordData.hanzi}</div>
+      <div class="pinyin">${wordData.pinyin}</div>
+    `;
+
+    const maxX = playArea.clientWidth - 115;
+    const posX = Math.max(15, Math.random() * maxX);
+    let posY = -140;
+
+    el.style.left = `${posX}px`;
+    el.style.top = `${posY}px`;
+
+    // [수정됨] 1개당 4.2초 동안 화면 전체를 통과하도록 하강 속도 계산 (60fps 기준)
+    const totalDistance = playArea.clientHeight + 150;
+    const speed = totalDistance / (4.2 * 60);
+
+    const balloonObj = {
+      el: el,
+      word: wordData,
+      x: posX,
+      y: posY,
+      speed: speed,
+      popped: false
+    };
+
+    el.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      if (balloonObj.popped || !isGameRunning) return;
+
+      const rect = playArea.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+
+      shootDart(clickX, clickY, () => {
+        handleBalloonHit(balloonObj);
+      });
+    });
+
+    playArea.appendChild(el);
+    activeBalloons.push(balloonObj);
+  }
+
+  function handleBalloonHit(balloonObj) {
+    if (balloonObj.popped) return;
+
+    if (balloonObj.word.hanzi === currentTarget.hanzi) {
+      balloonObj.popped = true;
+      playHitSound();
+      showPopEffect(balloonObj.x + 52, balloonObj.y + 65, balloonObj.el.style.backgroundColor);
+      balloonObj.el.remove();
+      activeBalloons = activeBalloons.filter(b => b !== balloonObj);
+
+      remainingList = remainingList.filter(item => item.hanzi !== currentTarget.hanzi);
+      remainCountEl.innerText = remainingList.length;
+
+      if (remainingList.length > 0) {
+        setNextTarget();
+      } else {
+        finishGameSuccess();
+      }
+    } else {
+      playWrongSound();
+      balloonObj.el.style.transform = "scale(0.9) rotate(-10deg)";
+      setTimeout(() => {
+        if (balloonObj.el) balloonObj.el.style.transform = "scale(1) rotate(0deg)";
+      }, 150);
+    }
+  }
+
+  function showPopEffect(x, y, color) {
+    const pop = document.createElement('div');
+    pop.className = 'pop-effect';
+    pop.style.left = `${x - 65}px`;
+    pop.style.top = `${y - 65}px`;
+    pop.style.background = `radial-gradient(circle, ${color} 0%, rgba(255,255,255,0.8) 50%, transparent 70%)`;
+    playArea.appendChild(pop);
+    setTimeout(() => pop.remove(), 350);
+  }
+
+  function setNextTarget() {
+    const randomIndex = Math.floor(Math.random() * remainingList.length);
+    currentTarget = remainingList[randomIndex];
+    targetMeaningEl.innerText = `"${currentTarget.meaning}"`;
+  }
+
+  function gameLoop() {
+    if (!isGameRunning) return;
+
+    for (let i = activeBalloons.length - 1; i >= 0; i--) {
+      const b = activeBalloons[i];
+      b.y += b.speed;
+      b.el.style.top = `${b.y}px`;
+
+      if (b.y > playArea.clientHeight + 20) {
+        b.el.remove();
+        activeBalloons.splice(i, 1);
+      }
+    }
+
+    animFrameId = requestAnimationFrame(gameLoop);
+  }
+
+  function startGame() {
+    initAudio();
+    stopGame();
+
+    isGameRunning = true;
+    remainingList = [...wordDatabase];
+    remainCountEl.innerText = remainingList.length;
+    celebrationModal.style.display = 'none';
+
+    setNextTarget();
+
+    // 4.2초 하강 속도에 맞춰 화면이 너무 붐비지 않도록 생성 간격을 1.8초(1800ms)로 여유 있게 조절
+    spawnBalloon();
+    spawnTimer = setInterval(spawnBalloon, 1800);
+    animFrameId = requestAnimationFrame(gameLoop);
+  }
+
+  function stopGame() {
+    isGameRunning = false;
+    if (spawnTimer) clearInterval(spawnTimer);
+    if (animFrameId) cancelAnimationFrame(animFrameId);
+
+    activeBalloons.forEach(b => b.el.remove());
+    activeBalloons = [];
+  }
+
+  function endGame() {
+    stopGame();
+    targetMeaningEl.innerText = "게임이 종료되었습니다.";
+    remainCountEl.innerText = "0";
+  }
+
+  function finishGameSuccess() {
+    stopGame();
+    targetMeaningEl.innerText = "참 잘했어요! 완벽합니다!";
+    celebrationModal.style.display = 'flex';
+
+    playFireworkSound();
+
+    const duration = 2.5 * 1000;
+    const end = Date.now() + duration;
+
+    (function frame() {
+      confetti({
+        particleCount: 5,
+        angle: 60,
+        spread: 55,
+        origin: { x: 0, y: 0.7 }
+      });
+      confetti({
+        particleCount: 5,
+        angle: 120,
+        spread: 55,
+        origin: { x: 1, y: 0.7 }
+      });
+
+      if (Date.now() < end) {
+        requestAnimationFrame(frame);
+      }
+    }());
+  }
+
+  playArea.addEventListener('mousedown', (e) => {
+    if (!isGameRunning) return;
+    if (e.target !== playArea) return;
+    const rect = playArea.getBoundingClientRect();
+    shootDart(e.clientX - rect.left, e.clientY - rect.top, () => {
+      playWrongSound();
+    });
+  });
+
+  btnStart.addEventListener('click', startGame);
+  btnEnd.addEventListener('click', endGame);
+  btnRestart.addEventListener('click', startGame);
+</script>
+</body>
+</html>
